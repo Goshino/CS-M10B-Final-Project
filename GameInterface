@@ -1,0 +1,112 @@
+using System.Collections;
+using UnityEngine;
+using UnityEngine.SceneManagement;
+using UnityEngine.UI;
+
+public class GameInterface : MonoBehaviour
+{
+    public Image fadePlane;
+    public GameObject gameOverInterface;
+
+    public RectTransform newWaveBanner;
+    public Text newWave_title;
+    public Text newWave_enemyCount;
+    public Text scoreInterface;
+    public Text gameOverScoreInterface;
+
+    EnemySpawner enemySpawner;
+    Player player;
+
+    void Start()
+    {
+        player = FindObjectOfType<Player>(); //OnGameOver subscribes to OnDeath function
+        player.OnDeath += OnGameOver;
+    }
+
+    void Update()
+    {
+        scoreInterface.text = Scorekeeper.Score.ToString("D6");
+    }
+
+    void Awake()
+    {
+        enemySpawner = FindObjectOfType<EnemySpawner>();
+        enemySpawner.NewWave += OnNewWave;
+    }
+
+    void OnNewWave(int waveNumber)
+    {
+        string[] waveNumbers = { "One", "Two", "Three", "Four", "Five" };
+        newWave_title.text = "- Wave " + waveNumbers[waveNumber - 1] + " -";
+        string string_enemyCounter = ((enemySpawner.waves[waveNumber - 1].survival) ? "Infinite" : enemySpawner.waves[waveNumber - 1].enemyCounter + " ");
+        newWave_enemyCount.text = "Enemies: " + string_enemyCounter;
+
+        StopCoroutine("AnimateNewWaveBanner");
+        StartCoroutine("AnimateNewWaveBanner");
+    }
+
+    IEnumerator AnimateNewWaveBanner()
+    {
+        float delayToReadTime = 1.5f;
+        float animateSpeed = 3f;
+        float animateProgress = 0;
+        int animateDirection = 1;
+
+        float endOfDelayTime = Time.time + 1/animateSpeed + delayToReadTime;
+
+        //While banner is in animation
+        while (animateProgress >= 0)
+        {
+            animateProgress += Time.deltaTime * animateSpeed * animateDirection; 
+
+            //Check to see if animateProgress is greater than 1
+            if (animateProgress >= 1)
+            {
+                animateProgress = 1;
+                //If delayTime is done then the banner animates back down
+                if (Time.time > endOfDelayTime)
+                {
+                    animateDirection = -1;
+                }
+            }
+
+            newWaveBanner.anchoredPosition = Vector2.up * Mathf.Lerp(-280, 45, animateProgress);
+            yield return null;
+        }
+    }
+
+    void OnGameOver()
+    {
+        Cursor.visible = true;
+        StartCoroutine(Fade(Color.clear, new Color(0.8867924f, 0.1380385f, 0.1380385f, 0.95f), 1)); //Fades screen from transparent to translucent black
+        gameOverScoreInterface.text = scoreInterface.text;
+        scoreInterface.gameObject.SetActive(false);
+        gameOverInterface.SetActive(true);
+    }
+
+    IEnumerator Fade(Color from, Color to, float time)
+    {
+        float speed = 1 / time;
+        float fadeProgress = 0;
+
+        //check to see if fadeProgress is still inprogress 
+        while (fadeProgress < 1)
+        {
+            fadeProgress += Time.deltaTime * speed;
+            fadePlane.color = Color.Lerp(from, to, fadeProgress);
+            yield return null;
+        }
+    }
+
+    //User Interface
+
+    public void StartNewGame()
+    {
+        SceneManager.LoadScene("Game");
+    }
+
+    public void QuitGame()
+    {
+        Application.Quit();
+    }
+}
