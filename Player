@@ -1,0 +1,84 @@
+using UnityEngine;
+using System.Collections;
+
+[RequireComponent (typeof (PlayerController))]
+[RequireComponent (typeof (GunController))]
+public class Player : Entity
+{
+    //Sets the movement speed of the player to 5
+    public float moveSpeed = 5;
+
+    public Crosshairs crosshair;
+
+    Camera cameraView;
+    PlayerController playerController;
+    GunController gunController;
+
+    //Overriden start functions, because Player inherits from Entity class
+    protected override void Start()
+    {
+        base.Start();
+    }
+
+    private void Awake()
+    {
+        playerController = GetComponent<PlayerController>();
+        gunController = GetComponent<GunController>();
+        cameraView = Camera.main;
+        FindObjectOfType<EnemySpawner>().NewWave += OnNewWave;
+    }
+
+    void OnNewWave(int waveNumber)
+    {
+        health = startingHealth;
+        gunController.EquipGun(waveNumber - 1);
+    }
+
+    //Movement and view logic
+    void Update()
+    {
+        //Movement Input Logic
+        Vector3 moveInput = new Vector3(Input.GetAxisRaw("Horizontal"), 0, Input.GetAxisRaw("Vertical"));
+        Vector3 moveVelocity = moveInput.normalized * moveSpeed; //Keeps direction and multiplies by movement speed variable
+        playerController.Move(moveVelocity);
+
+        Ray ray = cameraView.ScreenPointToRay(Input.mousePosition);
+        Plane groundPlane = new Plane(Vector3.up, Vector3.up * gunController.GunHeight);
+        float rayDistance;
+
+        //Look Input Logic
+        //Returns true if the ray intersects with the ground plane. If it does, we'll know the length from camera to point of intersection
+        if (groundPlane.Raycast(ray, out rayDistance))
+        {
+            Vector3 point = ray.GetPoint(rayDistance);
+            playerController.LookAt(point);
+            crosshair.transform.position = point;
+            crosshair.DetectEnemy(ray);
+            //Check to see if crosshair is more than a certain point from the character so gun does not animate weirdly
+            if ((new Vector2(point.x, point.z) - new Vector2(transform.position.x, transform.position.z)).sqrMagnitude > 0.8f)
+            {
+                gunController.Aim(point);
+            }
+        }
+
+        //Weapon Input Logic
+        if (Input.GetMouseButton(0))
+        {
+            gunController.OnTriggerHeld();
+        }
+        if (Input.GetMouseButtonUp(0))
+        {
+            gunController.OnTriggerReleased();
+        }
+        if(Input.GetKeyDown(KeyCode.R))
+        {
+            gunController.Reload();
+        }
+
+        //Player fall check
+        if (transform.position.y < -10)
+        {
+            TakeDamage(health);
+        }
+    }
+}
