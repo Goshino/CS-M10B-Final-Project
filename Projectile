@@ -1,0 +1,63 @@
+using UnityEngine;
+
+public class Projectile : MonoBehaviour
+{
+    //Default speed is 10
+    float speed = 10;
+    float damage = 1;
+
+    float lifetime = 3;
+    float hitBoxWidth = 0.1f;
+
+    public LayerMask collisionMask;
+
+    void Start()
+    {
+        Destroy(gameObject, lifetime);
+
+        Collider[] initialCollisions = Physics.OverlapSphere(transform.position, 0.1f, collisionMask);
+        //Checks to see if projectile is colliding with anything and takes damage accordingly
+        if (initialCollisions.Length > 0)
+        {
+            OnHitObject(initialCollisions[0], transform.position);
+        }
+    }
+
+    void Update()
+    {
+        float moveDistance = speed * Time.deltaTime;
+        CheckCollisions(moveDistance);
+        transform.Translate(Vector3.forward * moveDistance); //Moves the projectile forward by a rate of time and speed 
+    }
+
+    //Sets speed of projectile
+    public void SetSpeed(float newSpeed)
+    {
+        speed = newSpeed;
+    }
+
+    //Checks to see if projectile hit an object
+    void CheckCollisions(float moveDistance)
+    {
+        Ray ray = new Ray(transform.position, transform.forward);
+        RaycastHit hit;
+
+        //Logic to check for a hit
+        if (Physics.Raycast(ray, out hit, moveDistance + hitBoxWidth, collisionMask, QueryTriggerInteraction.Collide))
+        {
+            OnHitObject(hit.collider, hit.point);
+        }
+    }
+
+    //Overriding OnHitObject Function for a Collider parameter
+    void OnHitObject(Collider c, Vector3 hitPosition)
+    {
+        IDamagable damagableObject = c.GetComponent<IDamagable>();
+        //Checks to see if object is damagable
+        if (damagableObject != null)
+        {
+            damagableObject.TakeHit(damage, hitPosition, transform.forward);
+        }
+        GameObject.Destroy(gameObject);
+    }
+}
