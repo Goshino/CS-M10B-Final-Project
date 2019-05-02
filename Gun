@@ -1,0 +1,156 @@
+using UnityEngine;
+using System.Collections;
+
+public class Gun : MonoBehaviour
+{
+    public enum FiringMode { Auto, Burst, Single };
+    public FiringMode firingMode;
+
+    public Transform[] projectileSpawns;
+    public Projectile projectile;
+    public float rateOfFire_ms;
+    public float muzzleVelocity;
+    public int bulletsPerBurst;
+    public int bulletsPerMagazine;
+    public float timeToReload;
+    
+
+    [Header("Recoil")]
+    public Vector2 kickback_minMax;
+    public Vector2 recoilAngle_minMax;
+    public float recoilStabilizeTime;
+    public float recoilRotationStabilizeTime;
+
+    [Header("Gun Effects")]
+    public Transform shellEntity;
+    public Transform shellEjection;
+    MuzzleFlash muzzleFlash;
+    float timeOfNextShot;
+
+    bool triggerReleasedSinceLastShot;
+    int ofBulletsPerBurstHowManyRemain;
+    int bulletsRemainingInMagazine;
+    bool isReloading;
+
+    Vector3 recoilDampeningVelocity;
+    float recoilRotationDampeningVelocity;
+    float recoilAngle;
+
+    void Start()
+    {
+        muzzleFlash = GetComponent<MuzzleFlash>();
+        ofBulletsPerBurstHowManyRemain = bulletsPerBurst;
+        bulletsRemainingInMagazine = bulletsPerMagazine;
+    }
+
+    void LateUpdate()
+    {
+        //Animating Recoil
+        transform.localPosition = Vector3.SmoothDamp(transform.localPosition, Vector3.zero, ref recoilDampeningVelocity, recoilStabilizeTime);
+        recoilAngle = Mathf.SmoothDamp(recoilAngle, 0, ref recoilRotationDampeningVelocity, recoilRotationStabilizeTime);
+        transform.localEulerAngles = transform.localEulerAngles + Vector3.left * recoilAngle;
+
+        if (!isReloading && bulletsRemainingInMagazine == 0)        
+        {
+            Reload();
+        }
+    }
+
+    void Shoot()
+    {
+        //Checks to see if the time is okay to shoot a next shot
+        if (!isReloading && Time.time > timeOfNextShot && bulletsRemainingInMagazine > 0)
+        {
+            //Check to see if firing mode is burst fire
+            if (firingMode == FiringMode.Burst)
+            {
+                //Check to see if there are bullets remaining in burst shot
+                if (ofBulletsPerBurstHowManyRemain == 0)
+                {
+                    return;
+                }
+                ofBulletsPerBurstHowManyRemain--;
+            }
+            //Check to see if firing mode is in single fire
+            else if (firingMode == FiringMode.Single)
+            {
+                //Check to see if in process of firing
+                if (!triggerReleasedSinceLastShot)
+                {
+                    return;
+                }
+            }
+
+            for (int i = 0; i < projectileSpawns.Length; i++)
+            {
+                //Checks to see if there are no more bullets in the magazine
+                if (bulletsRemainingInMagazine == 0)
+                {
+                    break;
+                }
+                bulletsRemainingInMagazine--;
+                timeOfNextShot = Time.time + rateOfFire_ms / 1000; //Time is always increasing once game is played, so this always changes the timeOfNextShot variable
+                Projectile newProjectile = Instantiate(projectile, projectileSpawns[i].position, projectileSpawns[i].rotation) as Projectile; //Creates a new projectime from the muzzle position of the gun
+                newProjectile.SetSpeed(muzzleVelocity); //Sets the projectile speed to the muzzleVelocity variable
+            }
+
+            Instantiate(shellEntity, shellEjection.position, shellEjection.rotation); //Instantiates shell object with position and rotation
+            muzzleFlash.Activate(); //Creates a muzzle flash whenever the guns shoots
+            transform.localPosition -= Vector3.forward * Random.Range(kickback_minMax.x, kickback_minMax.y);
+            recoilAngle += Random.Range(recoilAngle_minMax.x, recoilAngle_minMax.y);
+            recoilAngle = Mathf.Clamp(recoilAngle, 0, 30);
+        }
+    }
+
+    public void Reload()
+    {
+        if (!isReloading && bulletsRemainingInMagazine != bulletsPerMagazine)
+        {
+            StartCoroutine(AnimateReload());
+        }
+    }
+
+    IEnumerator AnimateReload()
+    {
+        isReloading = true;
+        yield return new WaitForSeconds(0.2f);
+
+        float reloadSpeed = 1f / timeToReload;
+        float reloadProgress = 0;
+        Vector3 initialRotation = transform.localEulerAngles;
+        float maxReloadAngle = 30;
+
+        while (reloadProgress < 1)
+        {
+            reloadProgress += Time.deltaTime * reloadSpeed;
+            float interpolation = (-Mathf.Pow(reloadProgress, 2) + reloadProgress) * 4;
+            float reloadAngle = Mathf.Lerp(0, maxReloadAngle, interpolation);
+            transform.localEulerAngles = initialRotation + Vector3.left * reloadAngle;
+
+            yield return null;
+        }
+
+        isReloading = false;
+        bulletsRemainingInMagazine = bulletsPerMagazine;
+    }
+
+    public void OnTriggerHeld()
+    {
+        Shoot();
+        triggerReleasedSinceLastShot = false;
+    }
+
+    public void OnTriggerReleased()
+    {
+        triggerReleasedSinceLastShot = true;
+        ofBulletsPerBurstHowManyRemain = bulletsPerBurst;
+    }
+
+    public void Aim(Vector3 pointOfAim)
+    {
+        if (!isReloading)
+        {
+            transform.LookAt(pointOfAim);
+        }
+    }
+}
