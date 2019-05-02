@@ -1,0 +1,173 @@
+using System.Collections;
+using UnityEngine;
+
+public class EnemySpawner : MonoBehaviour
+{
+    public bool developerMode;
+
+    public Wave[] waves;
+    public Enemy enemy;
+
+    Entity player;
+    Transform playerTransform;
+
+    int enemiesRemainingForWave;
+    int liveEnemiesRemaining; 
+    float timeTillNextSpawn;
+
+    Wave currentwave;
+    int indexOfCurrentWave;
+
+    MapGenerator map;
+
+    float timeBetweenCamping = 1.5f;
+    float moveRequirement = 1.5f;
+    float nextCampingCheck;
+    Vector3 oldCampingPosition;
+    bool isCamping;
+
+    bool disableUpdate;
+
+    public event System.Action<int> NewWave;
+    
+    //Starts the next wave in Wave[] array
+    void Start()
+    {
+        player = FindObjectOfType<Player>();
+        playerTransform = player.transform;
+
+        //Camping check logic
+        nextCampingCheck = timeBetweenCamping + Time.time;
+        oldCampingPosition = playerTransform.position;
+        player.OnDeath += onPlayerDeath; //Subrscribes OnDeath of player to onPlayerDeath
+
+        map = FindObjectOfType<MapGenerator>();
+        NextWave();
+    }
+
+    void Update()
+    {
+        //Check to see if player has died in order to keep updating the spawner
+        if (!disableUpdate)
+        {
+            //Checks to see if player is camping an area
+            if (Time.time > nextCampingCheck)
+            {
+                nextCampingCheck = Time.time + timeBetweenCamping; //Sets new nextCampingCheck
+
+                isCamping = (Vector3.Distance(playerTransform.position, oldCampingPosition) < moveRequirement); //Bool to check to see if player has moved the set requirement distance
+                oldCampingPosition = playerTransform.position; //Sets oldCampingPosition variable to where the player is located in the map
+            }
+
+            //Checks to see if there are more enemies in queue and time is valid to spawn in order to spawn new enemies
+            if ((enemiesRemainingForWave > 0  || currentwave.survival) && (Time.time > timeTillNextSpawn))
+            {
+                enemiesRemainingForWave--;
+                timeTillNextSpawn = Time.time + currentwave.timeBetweenEnemySpawns;
+
+                StartCoroutine(SpawnEnemy());
+            }
+        }
+
+        //Checks to see if player is in developer mode
+        if (developerMode)
+        {
+            if(Input.GetKeyDown(KeyCode.Return))
+            {
+                StopCoroutine("SpawnEnemy");
+                //For loop that finds and destroys enemies
+                foreach (Enemy enemy in FindObjectsOfType<Enemy>())
+                {
+                    GameObject.Destroy(enemy.gameObject);
+                }
+                NextWave();
+            }
+        }
+    }
+
+    IEnumerator SpawnEnemy()
+    {
+        float timeTillSpawn = 1; //How long it takes for an enemy to spawn once a tile becomes a "warning" tile
+        float tileFlashingSpeed = 4; //How fast the tile flashes its spawnColor color
+
+        Transform spawnTile = map.GetRandomOpenTile(); //Gets a random open tile from MapGenerator class
+        if(isCamping)
+        {
+            spawnTile = map.GetTileFromPosition(playerTransform.position);
+        }
+        Material tileMaterial = spawnTile.GetComponent<Renderer>().material; //Gets the tile material of the open tile
+        Color initialColor = Color.white; //Saves tile color
+        Color spawnColor = Color.red; //Spawner color
+        float spawnTimer = 0; //Timer inbetween spawns
+
+        //Check to see if spawnTimer has not surpassed timeTillSpawn in order to properly animate the spawning of an enemy
+        while(spawnTimer < timeTillSpawn)
+        {
+            tileMaterial.color = Color.Lerp(initialColor, spawnColor, Mathf.PingPong(spawnTimer * tileFlashingSpeed, 1)); //Flashes color between initial color and spawnColor color of tile
+            spawnTimer += Time.deltaTime;
+            yield return null;
+        }
+
+        Enemy spawnEnemy = Instantiate(enemy, spawnTile.position + Vector3.up, Quaternion.identity) as Enemy; //Creates a new enemy at the center of the map with no specific rotation
+        spawnEnemy.OnDeath += OnEnemyDeath; //When an enemy dies, OnEnemyDeath function will be calleds
+        spawnEnemy.SetCharacteristics(currentwave.movementSpeed, currentwave.hitsToKill, currentwave.enemyHealth, currentwave.enemyColor);
+    }
+
+    void onPlayerDeath()
+    {
+        disableUpdate = true;
+    }
+
+    //Decrements liveEnemiesRemaining variable in order to execute NextWave function
+    void OnEnemyDeath()
+    {
+        liveEnemiesRemaining--;
+
+        if (liveEnemiesRemaining == 0)
+        {
+            NextWave();
+        }
+    }
+
+    //Function that resets the player's position
+    void PlayerPositionReset()
+    {
+        playerTransform.position = map.GetTileFromPosition(Vector3.zero).position + Vector3.up * 3; 
+    }
+
+    //Initializes the next wave and increments from the previous
+    void NextWave()
+    {
+        indexOfCurrentWave++;
+
+        //Check to see if NextWave is executable
+        if (indexOfCurrentWave - 1 < waves.Length)
+        {
+            currentwave = waves[indexOfCurrentWave - 1];
+
+            enemiesRemainingForWave = currentwave.enemyCounter;
+            liveEnemiesRemaining = enemiesRemainingForWave;
+
+            //Checks to see if there is a new wave available
+            if (NewWave != null)
+            {
+                NewWave(indexOfCurrentWave);
+            }
+            PlayerPositionReset();
+        }
+    }
+
+    //Wave class that will handle the enemmies per wave and the time between enemy spawns
+    [System.Serializable]
+    public class Wave
+    {
+        public bool survival;
+        public int enemyCounter;
+        public float timeBetweenEnemySpawns;
+
+        public float movementSpeed;
+        public int hitsToKill;
+        public float enemyHealth;
+        public Color enemyColor;
+    }
+}
