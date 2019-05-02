@@ -1,0 +1,179 @@
+using System.Collections;
+using UnityEngine;
+using UnityEngine.AI;
+
+[RequireComponent (typeof (NavMeshAgent))]
+public class Enemy : Entity
+{
+    public enum State { Idle, Chasing, Attacking }
+    State currentState;
+
+    public ParticleSystem deathEffect;
+    public static event System.Action StaticOnDeath;
+
+    NavMeshAgent pathfinder;
+    Transform target;
+    Entity targetEntity; 
+    Material attackIndicator;
+
+    Color originalColor;
+
+    float distanceToAttack = 0.5f;
+    float attackCoolDown = 1;
+    float damage = 1;
+
+    float timeTillNextAttack;
+    float myCollisionRadius;
+    float targetCollisionRadius;
+
+    bool hasTarget;
+
+    void Awake()
+    {
+        pathfinder = GetComponent<NavMeshAgent>();
+
+        if (GameObject.FindGameObjectWithTag("Player") != null)
+        {
+            hasTarget = true;
+
+            target = GameObject.FindGameObjectWithTag("Player").transform;
+            targetEntity = target.GetComponent<Entity>();
+
+            //Sets collision radius of target and enemy
+            myCollisionRadius = GetComponent<CapsuleCollider>().radius;
+            targetCollisionRadius = target.GetComponent<CapsuleCollider>().radius;
+        }
+    }
+
+    //Overriden start functions, because Enemy inherits from Entity class
+    protected override void Start()
+    {
+        base.Start(); //Calls Entity Start function which initializes the health of enemy 
+        
+        //Check to see if game object with "Player" tag exists
+        if (hasTarget)
+        {
+            currentState = State.Chasing; //Initially sets state of enemy to chasing
+            targetEntity.OnDeath += OnTargetDeath;
+
+            StartCoroutine(UpdatePath()); //Calls UpdatedPath via StartCoroutine because of IEnumerate
+        }
+    }
+
+    //Sets the characteristics of an enemy
+    public void SetCharacteristics(float movementSpeed, int hitsToKill, float enemyHealth, Color enemyColor)
+    {
+        pathfinder.speed = movementSpeed;
+
+        if (hasTarget)
+        {
+            damage = Mathf.Ceil(targetEntity.startingHealth / hitsToKill);
+        }
+        startingHealth = enemyHealth;
+
+        deathEffect.startColor = new Color(enemyColor.r, enemyColor.g, enemyColor.b, 1);
+        attackIndicator = GetComponent<Renderer>().material;
+        attackIndicator.color = enemyColor;
+        originalColor = attackIndicator.color;
+
+    }
+
+    public override void TakeHit(float damage, Vector3 hitPosition, Vector3 hitDirection)
+    {
+        //If damage is more than health then instantiate death effect 
+        if (damage >= health && !isDead)
+        {
+            if (StaticOnDeath != null)
+            {
+                StaticOnDeath();
+            }
+            Destroy(Instantiate(deathEffect.gameObject, hitPosition, Quaternion.FromToRotation(Vector3.forward, hitDirection)) as GameObject, deathEffect.startLifetime);
+        }
+        base.TakeHit(damage, hitPosition, hitDirection);
+    }
+
+    //Function to react for player death
+    void OnTargetDeath()
+    {
+        hasTarget = false;
+        currentState = State.Idle;
+    }
+
+    void Update()
+    {
+        //Checks to see if enemy has a targe, is so it'll begin chasing down the target
+        if (hasTarget)
+        {
+            //Check to see if available to attack
+            if (Time.time > timeTillNextAttack)
+            {
+                float distanceToTarget_sqrd = (target.position - transform.position).sqrMagnitude; //Variable that calculates distance between two points in squared form, because sqrt operator is inefficient and costly
+                                                                                                   //Check to see if target is in attacking distance
+                if (distanceToTarget_sqrd < Mathf.Pow(distanceToAttack + myCollisionRadius + targetCollisionRadius, 2))
+                {
+                    timeTillNextAttack = Time.time + timeTillNextAttack; //Increments timeTillNextAttack accordingly
+                    StartCoroutine(Attack());
+                }
+            }
+        }
+    }
+
+    IEnumerator Attack()
+    {
+        currentState = State.Attacking; //Changes state to attacking
+        pathfinder.enabled = false; //Temporarily pauses pathfinder
+
+        Vector3 originalPosition = transform.position;
+        Vector3 directionToTarget = (target.position - transform.position).normalized;
+        Vector3 attackPosition = target.position - directionToTarget * (myCollisionRadius);
+
+        float attackProgress = 0;
+        float attackSpeed = 3;
+
+        attackIndicator.color = Color.red;
+        bool damageDealt = false; 
+
+        //While in animation to attack
+        while (attackProgress <= 1)
+        {
+            //Check to see if enemy has hit player and damage has not yet been dealt 
+            if (attackProgress >= 0.5f && !damageDealt)
+            {
+                damageDealt = true;
+                targetEntity.TakeDamage(damage);
+            }
+            attackProgress += Time.deltaTime * attackSpeed;
+            float interpolation = (-Mathf.Pow(attackProgress, 2) + attackProgress) * 4;
+            transform.position = Vector3.Lerp(originalPosition, attackPosition, interpolation);
+
+            yield return null; 
+        }
+
+        attackIndicator.color = originalColor;
+        currentState = State.Chasing; //Sets State to Chasing again
+        pathfinder.enabled = true; //Enables pathfinder
+    }
+
+    //Sets destination path for enemy
+    IEnumerator UpdatePath()
+    {
+        float destinationRefreshRate = .25f; 
+
+        //While target is existing, calculate a destination path towards the target
+        while (hasTarget)
+        {
+            //Check to make sure state is in chasing so it does not chase enemy while attacking
+            if (currentState == State.Chasing)
+            {
+                Vector3 directionToTarget = (target.position - transform.position).normalized; //Finds direction to player
+                Vector3 targetPosition = target.position - directionToTarget * (myCollisionRadius + targetCollisionRadius + distanceToAttack/2); //Sets targetPosition with collision radius in mind
+                //Check to see if enemy is not dead, so error calculation does not occur for pathfinding
+                if (!isDead)
+                {
+                    pathfinder.SetDestination(targetPosition);
+                }
+            }
+            yield return new WaitForSeconds(destinationRefreshRate);
+        }
+    }
+}
