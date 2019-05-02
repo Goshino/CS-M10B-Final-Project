@@ -1,0 +1,43 @@
+using System.Collections;
+using UnityEngine;
+
+public class Shell : MonoBehaviour
+{
+    public Rigidbody myRigidbody;
+    public float force_min;
+    public float force_max;
+
+    float lifeTime = 4;
+    float fadeTime = 2;
+
+    void Start()
+    {
+        float force = Random.Range(force_min, force_max); //Randomly decides force between force_min and force_max variable
+        myRigidbody.AddForce(transform.right * force); //Ejects mag from right side of gun
+        myRigidbody.AddTorque(Random.insideUnitSphere * force); //Adds torque in relation to force variable
+
+        StartCoroutine(Fade());
+    }
+
+    //Animation for ejecting magazing and making the magazine disappear
+    IEnumerator Fade()
+    {
+        yield return new WaitForSeconds(lifeTime);
+
+        float fadeProgress = 0;
+        float fadeSpeed = 1 / fadeTime;
+
+        Material shellMaterial = GetComponent<Renderer>().material;
+        Color initialColor = shellMaterial.color;
+
+        //While fadeProgress is still in progress, creates an animation for cartridge reload 
+        while (fadeProgress < 1)
+        {
+            fadeProgress += Time.deltaTime * fadeSpeed;
+            shellMaterial.color = Color.Lerp(initialColor, Color.clear, fadeProgress);
+            yield return null;
+        }
+
+        Destroy(gameObject);
+    }
+}
