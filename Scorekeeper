@@ -1,0 +1,39 @@
+using System.Collections;
+using System.Collections.Generic;
+using UnityEngine;
+
+public class Scorekeeper : MonoBehaviour
+{
+    public static int Score { get; private set; }
+    float timeOfLastEnemyDeath;
+    int streakCounter;
+    float timeOfStreakExpire = 1;
+
+    void Start()
+    {
+        Enemy.StaticOnDeath += OnEnemyKilled;
+        FindObjectOfType<Player>().OnDeath += OnPlayerDeath;
+    }
+
+    //Function that handles the score management
+    void OnEnemyKilled()
+    {
+        if (Time.time < timeOfLastEnemyDeath + timeOfStreakExpire)
+        {
+            streakCounter++;
+        }
+        else
+        {
+            streakCounter = 0;
+        }
+        timeOfLastEnemyDeath = Time.time;
+
+        Score += 5 + (int)Mathf.Pow(2, streakCounter);
+    }
+
+    //Resets subscription whenever the player dies
+    void OnPlayerDeath()
+    {
+        Enemy.StaticOnDeath -= OnEnemyKilled;
+    }
+}
