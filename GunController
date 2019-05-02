@@ -1,0 +1,79 @@
+using System.Collections;
+using System.Collections.Generic;
+using UnityEngine;
+
+public class GunController : MonoBehaviour
+{
+    public Transform holdWeapon;
+    public Gun[] gunArray;
+    Gun equippedGun;
+
+    void Start()
+    {
+       //If starting gun is assigned, then create a starting gun
+    }
+
+    public void EquipGun(Gun gunToEquip)
+    {
+        //If there is an already existing gun, destroy the preexisting gun object
+        if (equippedGun != null)
+        {
+            Destroy(equippedGun.gameObject);
+        }
+        equippedGun = Instantiate(gunToEquip, holdWeapon.position, holdWeapon.rotation) as Gun; //Creates a gun at holdWeapon variable position (casted as Gun object)
+        equippedGun.transform.parent = holdWeapon;
+    }
+
+    public void EquipGun(int weaponIndex)
+    {
+        if (weaponIndex <= 3)
+        {
+            EquipGun(gunArray[weaponIndex]);
+        }
+        else
+        {
+            EquipGun(gunArray[Random.Range(0,3)]);
+        }
+    }
+
+    public void OnTriggerHeld()
+    {
+        //Check to see if gun is equipped, if there is an equipped gun then shoot
+        if (equippedGun != null)
+        {
+            equippedGun.OnTriggerHeld();
+        }
+    }
+
+    public void OnTriggerReleased()
+    {
+        //Check to see if gun is equipped, if there is an equipped gun then shoot
+        if (equippedGun != null)
+        {
+            equippedGun.OnTriggerReleased();
+        }
+    }
+
+    public float GunHeight
+    {
+        get {
+            return holdWeapon.position.y;
+        }
+    }
+
+    public void Aim (Vector3 pointOfAim)
+    {
+        if (equippedGun != null)
+        {
+            equippedGun.Aim(pointOfAim);
+        }
+    }
+
+    public void Reload()
+    {
+        if (equippedGun != null)
+        {
+            equippedGun.Reload();
+        }
+    }
+}
