@@ -1,0 +1,44 @@
+using UnityEngine;
+
+public class Entity : MonoBehaviour, IDamagable 
+{
+    public float startingHealth; 
+    protected float health;
+    protected bool isDead;
+
+    public event System.Action OnDeath; 
+
+    //Sets health of object as startingHealth variable
+    protected virtual void Start()
+    {
+        health = startingHealth;
+    }
+
+    //Object takes hit and looses health accordingly
+    public virtual void TakeHit(float damage, Vector3 hitPosition, Vector3 hitDirection)
+    {
+        TakeDamage(damage);
+    }
+
+    public virtual void TakeDamage(float damage)
+    {
+        health -= damage;
+
+        if(health <= 0 && !isDead)
+        {
+            Die();
+        }
+    }
+    
+    //Sets isDead boolean to true if object is at zero or less than zero health
+    [ContextMenu("Self Destruct")]
+    protected void Die()
+    {
+        isDead = true;
+        if (OnDeath != null)
+        {
+            OnDeath();
+        }
+        GameObject.Destroy(gameObject); //Destroys game object
+    }
+}
