@@ -1,0 +1,35 @@
+using System.Collections;
+using System.Collections.Generic;
+using UnityEngine;
+
+public class Crosshairs : MonoBehaviour
+{
+    public LayerMask targetMask;
+    public SpriteRenderer innerCrosshair;
+    public Color crosshairsLightUp;
+    Color originalInnerCrosshairColor;
+
+    void Start()
+    {
+        Cursor.visible = false;
+        originalInnerCrosshairColor = innerCrosshair.color;
+    }
+
+    void Update()
+    {
+        transform.Rotate(Vector3.forward * 40 * Time.deltaTime);
+    }
+
+    public void DetectEnemy(Ray ray)
+    {
+        //Check to see if crosshairs hit something in targetMask
+        if (Physics.Raycast(ray, 100, targetMask))
+        {
+            innerCrosshair.color = crosshairsLightUp; 
+        }
+        else
+        {
+            innerCrosshair.color = originalInnerCrosshairColor;
+        }
+    }
+}
