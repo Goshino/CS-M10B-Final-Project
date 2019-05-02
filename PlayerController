@@ -1,0 +1,36 @@
+using System;
+using System.Collections;
+using System.Collections.Generic;
+using UnityEngine;
+
+[RequireComponent (typeof(Rigidbody))]
+public class PlayerController : MonoBehaviour
+{
+    Vector3 velocity;
+    Rigidbody myRigidbody;
+     
+    void Start()
+    {
+        myRigidbody = GetComponent<Rigidbody>();
+    }
+
+    //Moves player
+    void FixedUpdate()
+    {
+        myRigidbody.MovePosition(myRigidbody.position + velocity * Time.fixedDeltaTime);
+    }
+
+    //Moves in a certain velocity with Vector3 input
+    public void Move(Vector3 _velocity)
+    {
+        velocity = _velocity;
+    }
+
+    //Look mechanic to aim the gun
+    public void LookAt(Vector3 look)
+    {
+        //Makes it so that the capsule does not "topple over when looking at a point"
+        Vector3 lookCorrection = new Vector3(look.x, transform.position.y, look.z);
+        transform.LookAt(lookCorrection); 
+    }
+}
