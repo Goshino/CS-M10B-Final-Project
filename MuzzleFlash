@@ -1,0 +1,36 @@
+using System.Collections;
+using System.Collections.Generic;
+using UnityEngine;
+
+public class MuzzleFlash : MonoBehaviour
+{
+    public GameObject flashHolder;
+    public Sprite[] flashSpriteSheet;
+    public SpriteRenderer[] spriteRenderer;
+
+    public float flashTime;
+
+    void Start()
+    {
+        Deactivate(); //Game starts with flashHolder active state initially set to false
+    }
+
+    public void Activate()
+    {
+        flashHolder.SetActive(true);
+
+        int flashSpriteSheetIndex = Random.Range(0, flashSpriteSheet.Length); //Picks a random muzzle flash
+        //For loop that initializes the array of flashSpriteSheet from our randomly generated number flashSpriteSheetIndex variable
+        for(int i = 0; i < spriteRenderer.Length; i++)
+        {
+            spriteRenderer[i].sprite = flashSpriteSheet[flashSpriteSheetIndex];
+        }
+
+        Invoke("Deactivate", flashTime);
+    }
+
+    public void Deactivate()
+    {
+        flashHolder.SetActive(false);
+    }
+}
